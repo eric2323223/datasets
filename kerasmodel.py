@@ -1,13 +1,24 @@
-from keras.layers import Conv2D, Dense, concatenate, ZeroPadding2D, merge, MaxPooling2D, Activation, AveragePooling2D, Concatenate, BatchNormalization, Input
+from keras.layers import Conv2D, Dense, concatenate, Flatten, ZeroPadding2D, merge, MaxPooling2D, Activation, AveragePooling2D, Concatenate, BatchNormalization, Input
 from keras.models import Sequential, Model
 import numpy as np
 import keras.backend as K
+import h5py
 
-# def setWeights(model):
-#     for layer in model.getl
+def setWeights():
+    f = h5py.File('./models/model.h5', 'r')
+    for key in f.keys():
+        for item in f[key].items():
+            layer_name = item[0]
+            layer_weights = item[1].items()
+            # print(list(layer_weights))
+            layer_weights_bias = list(layer_weights)[0][1].value
+            layer_weights_kernel = list(layer_weights)[1][1].value
+
+
+
 
 def build_model():
-    input = Input(shape=(112,112,3))
+    input = Input(shape=(150, 150, 3))
     conv1 = (Conv2D(64, kernel_size=7, strides=2, name='conv1', activation='relu'))(input)
     pool1 = (MaxPooling2D((3,3), strides=2, name='pool1'))(conv1)
     norm1 = (BatchNormalization(name='norm1'))(pool1)
@@ -37,7 +48,8 @@ def build_model():
     icp2_out1 = Conv2D(192, (3, 3), strides=1, name='icp2_out1', activation='relu')(icp2_reduction1)
 
     icp2_reduction2 = Conv2D(32, (1,1), strides=1, name='icp2_reduction2', activation='relu')(icp2_in)
-    icp2_out2 = Conv2D(96, (5, 5), strides=1, name='icp2_out2', activation='relu')(icp2_reduction2)
+    icp2_padding = ZeroPadding2D((1,1))(icp2_in)
+    icp2_out2 = Conv2D(96, (5, 5), strides=1, name='icp2_out2', activation='relu')(icp2_padding)
 
     icp2_pool = MaxPooling2D((3, 3), strides=1, name='icp2_pool')(icp2_in)
     icp2_out3 = Conv2D(64, (1, 1), strides=1, name='icp2_out3', activation='relu')(icp2_pool)
@@ -46,13 +58,14 @@ def build_model():
 
 
     # inception block3
-    icp2_out = concatenate([ icp2_out1,  icp2_out3], name='icp2_out')
+    icp2_out = concatenate([ icp2_out1, icp2_out2, icp2_out3], name='icp2_out')
     # icp3_in = MaxPooling2D((3,3), strides=2, name='icp3_in')(icp2_out)
     icp3_reduction1 = Conv2D(112, (1,1), strides=1, name='icp3_reduction1',activation='relu')(icp2_out)
     icp3_out1 = Conv2D(224, (3,3), strides=1, name='icp3_out1', activation='relu')(icp3_reduction1)
 
     icp3_reduction2 = Conv2D(24, (1,1), strides=1, name='icp3_reduction2', activation='relu')(icp2_out)
-    icp3_out2 = Conv2D(64, (5,5), strides=1, name='icp3_out2', activation='relu')(icp3_reduction2)
+    icp3_padding = ZeroPadding2D((1,1))(icp3_reduction2)
+    icp3_out2 = Conv2D(64, (5,5), strides=1, name='icp3_out2', activation='relu')(icp3_padding)
 
     icp3_pool = MaxPooling2D((3,3), strides=1, name='icp3_pool')(icp2_out)
     icp3_out3 = Conv2D(64, (1,1), strides=1, name='icp3_out3', activation='relu')(icp3_pool)
@@ -61,12 +74,13 @@ def build_model():
 
 
     # inception block4
-    icp3_out = concatenate([icp3_out1, icp3_out3], name='icp3_out')
+    icp3_out = concatenate([icp3_out1, icp3_out2, icp3_out3], name='icp3_out')
     icp4_reduction1 = Conv2D(160, (1,1), strides=1, name='icp4_reduction1', activation='relu')(icp3_out)
     icp4_out1 = Conv2D(320, (3,3), strides=1, name='icp4_out1', activation='relu')(icp4_reduction1)
 
     icp4_reduction2 = Conv2D(32, (1,1), strides=1, name='icp4_reduction2', activation='relu')(icp3_out)
-    icp4_out2 = Conv2D(128, (5,5), strides=1, name='icp4_out2', activation='relu')(icp4_reduction2)
+    icp4_padding = ZeroPadding2D((1,1))(icp3_out)
+    icp4_out2 = Conv2D(128, (5,5), strides=1, name='icp4_out2', activation='relu')(icp4_padding)
 
     icp4_pool = MaxPooling2D((3,3), strides=1, name='icp4_pool')(icp3_out)
     icp4_out3 = Conv2D(128, (1,1), strides=1, name='icp4_out3', activation='relu')(icp4_pool)
@@ -74,12 +88,13 @@ def build_model():
     icp4_out0 = Conv2D(256, (1,1), strides=1, name='icp4_out0', activation='relu')(icp3_out)
     #
     #
-    icp4_out = concatenate([icp4_out1, icp4_out3], name='icp4_out')
-    # cls3_pool = AveragePooling2D((5,5), strides=3, name='cls3_pool')(icp4_out)
-    # cls3_reduction = Conv2D(128, (1,1), strides=1, name='cls3_reduction', activation='relu')(cls3_pool)
-    # cls3_fc1 = Dense(1024, name='cls_fc1')(cls3_reduction)
-    # cls3_fc2 = Dense(7354, name='cls_fc2')(cls3_fc1)
-    # loss = Activation('softmax')(cls3_fc2)
+    icp4_out = concatenate([icp4_out1, icp4_out2, icp4_out3], name='icp4_out')
+    cls3_pool = AveragePooling2D((5,5), strides=3, name='cls3_pool')(icp4_out)
+    cls3_reduction = Conv2D(128, (1,1), strides=1, name='cls3_reduction', activation='relu')(cls3_pool)
+    cls3_flatten = Flatten()(cls3_reduction)
+    cls3_fc1 = Dense(1024, name='cls_fc1')(cls3_flatten)
+    cls3_fc2 = Dense(7354, name='cls_fc2')(cls3_fc1)
+    loss = Activation('softmax')(cls3_fc2)
 
     # model0 = Model(inputs=input, outputs=icp1_out0)
     # model0.summary()
@@ -88,29 +103,31 @@ def build_model():
     # model3 = Model(input=input, outputs=icp1_out3)
     # model3.summary()
 
-    model = Model(inputs=input, outputs=icp4_out)
+    model = Model(inputs=input, outputs=loss)
     model.summary()
     return model
 
 
 
-def test():
-    input_a = np.reshape([1, 2, 3], (1, 1, 3))
-    input_b = np.reshape([4, 5, 6], (1, 1, 3))
+# def test():
+#     input_a = np.reshape([1, 2, 3], (1, 1, 3))
+#     input_b = np.reshape([4, 5, 6], (1, 1, 3))
+#
+#     a = Input(shape=(1, 3))
+#     b = Input(shape=(1, 3))
+#
+#     concat = merge([a, b], mode='concat', concat_axis=-1)
+#     dot = merge([a, b], mode='dot', dot_axes=2)
+#     cos = merge([a, b], mode='cos', dot_axes=2)
+#
+#     model_concat = Model(input=[a, b], output=concat)
+#     model_dot = Model(input=[a, b], output=dot)
+#     model_cos = Model(input=[a, b], output=cos)
+#
+#     print(model_concat.predict([input_a, input_b]))
+#     print(model_dot.predict([input_a, input_b]))
+#     print(model_cos.predict([input_a, input_b]))
 
-    a = Input(shape=(1, 3))
-    b = Input(shape=(1, 3))
 
-    concat = merge([a, b], mode='concat', concat_axis=-1)
-    dot = merge([a, b], mode='dot', dot_axes=2)
-    cos = merge([a, b], mode='cos', dot_axes=2)
-
-    model_concat = Model(input=[a, b], output=concat)
-    model_dot = Model(input=[a, b], output=dot)
-    model_cos = Model(input=[a, b], output=cos)
-
-    print(model_concat.predict([input_a, input_b]))
-    print(model_dot.predict([input_a, input_b]))
-    print(model_cos.predict([input_a, input_b]))
-
+setWeights()
 build_model()
