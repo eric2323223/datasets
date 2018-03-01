@@ -1,20 +1,21 @@
-from keras.layers import Conv2D, Dense, concatenate, Flatten, ZeroPadding2D, merge, MaxPooling2D, Activation, AveragePooling2D, Concatenate, BatchNormalization, Input
+from keras.layers import Conv2D, Dense, concatenate, Flatten, Cropping2D, ZeroPadding2D, merge, MaxPooling2D, Activation, AveragePooling2D, Concatenate, BatchNormalization, Input
 from keras.models import Sequential, Model
-import numpy as np
-import keras.backend as K
 import h5py
+from keras.preprocessing import image
+import numpy as np
 
-def setWeights():
+def setWeights(model):
     f = h5py.File('./models/model.h5', 'r')
     for key in f.keys():
-        for item in f[key].items():
-            layer_name = item[0]
-            layer_weights = item[1].items()
-            # print(list(layer_weights))
-            layer_weights_bias = list(layer_weights)[0][1].value
-            layer_weights_kernel = list(layer_weights)[1][1].value
-
-
+        layer = list(f[key].items())[0][1]
+        layerName = (list(f[key].items())[0][0])
+        weights = list(layer.items())
+        # print(weights)
+        kernel = weights[1][1]
+        bias = weights[0][1]
+        # print(layerName)
+        model.get_layer(layerName).set_weights([kernel.value, bias.value])
+    print("weights are set")
 
 
 def build_model():
@@ -39,26 +40,26 @@ def build_model():
     icp1_pool = MaxPooling2D((3, 3), strides=(1,1), name='icp1_pool')(pool2)
     icp1_out3 = Conv2D(32, (1, 1), strides=(1,1), name='icp1_out3', activation="relu")(icp1_pool)
 
-    icp1_out0 = Conv2D(64, (1, 1), padding="valid", name='icp1_out0', activation='relu')(pool2)
+    icp1_out0 = Conv2D(64, (1, 1), padding="valid", name='icp1_out0', activation='relu')(Cropping2D(cropping=1)(pool2))
     #
     #
     # # inception block2
-    icp2_in = concatenate([icp1_out1, icp1_out2, icp1_out3], axis=3, name='icp2_in')
+    icp2_in = concatenate([icp1_out0, icp1_out1, icp1_out2, icp1_out3], axis=3, name='icp2_in')
     icp2_reduction1 = Conv2D(128, (1,1), strides=1, name='icp2_reduction1', activation='relu')(icp2_in)
     icp2_out1 = Conv2D(192, (3, 3), strides=1, name='icp2_out1', activation='relu')(icp2_reduction1)
 
     icp2_reduction2 = Conv2D(32, (1,1), strides=1, name='icp2_reduction2', activation='relu')(icp2_in)
-    icp2_padding = ZeroPadding2D((1,1))(icp2_in)
+    icp2_padding = ZeroPadding2D((1,1))(icp2_reduction2)
     icp2_out2 = Conv2D(96, (5, 5), strides=1, name='icp2_out2', activation='relu')(icp2_padding)
 
     icp2_pool = MaxPooling2D((3, 3), strides=1, name='icp2_pool')(icp2_in)
     icp2_out3 = Conv2D(64, (1, 1), strides=1, name='icp2_out3', activation='relu')(icp2_pool)
 
-    icp2_out0 = Conv2D(128, (1, 1), strides=1, name='icp2_out0', activation='relu')(icp2_in)
+    icp2_out0 = Conv2D(128, (1, 1), strides=1, name='icp2_out0', activation='relu')(Cropping2D(cropping=1)(icp2_in))
 
 
     # inception block3
-    icp2_out = concatenate([ icp2_out1, icp2_out2, icp2_out3], name='icp2_out')
+    icp2_out = concatenate([icp2_out0, icp2_out1, icp2_out2, icp2_out3], name='icp2_out')
     # icp3_in = MaxPooling2D((3,3), strides=2, name='icp3_in')(icp2_out)
     icp3_reduction1 = Conv2D(112, (1,1), strides=1, name='icp3_reduction1',activation='relu')(icp2_out)
     icp3_out1 = Conv2D(224, (3,3), strides=1, name='icp3_out1', activation='relu')(icp3_reduction1)
@@ -70,43 +71,48 @@ def build_model():
     icp3_pool = MaxPooling2D((3,3), strides=1, name='icp3_pool')(icp2_out)
     icp3_out3 = Conv2D(64, (1,1), strides=1, name='icp3_out3', activation='relu')(icp3_pool)
 
-    icp3_out0 = Conv2D(160, (1,1), strides=1, name='icp3_out0', activation='relu')(icp2_out)
+    icp3_out0 = Conv2D(160, (1,1), strides=1, name='icp3_out0', activation='relu')(Cropping2D(cropping=1)(icp2_out))
 
 
     # inception block4
-    icp3_out = concatenate([icp3_out1, icp3_out2, icp3_out3], name='icp3_out')
+    icp3_out = concatenate([icp3_out0, icp3_out1, icp3_out2, icp3_out3], name='icp3_out')
     icp4_reduction1 = Conv2D(160, (1,1), strides=1, name='icp4_reduction1', activation='relu')(icp3_out)
     icp4_out1 = Conv2D(320, (3,3), strides=1, name='icp4_out1', activation='relu')(icp4_reduction1)
 
     icp4_reduction2 = Conv2D(32, (1,1), strides=1, name='icp4_reduction2', activation='relu')(icp3_out)
-    icp4_padding = ZeroPadding2D((1,1))(icp3_out)
+    icp4_padding = ZeroPadding2D((1,1))(icp4_reduction2)
     icp4_out2 = Conv2D(128, (5,5), strides=1, name='icp4_out2', activation='relu')(icp4_padding)
 
     icp4_pool = MaxPooling2D((3,3), strides=1, name='icp4_pool')(icp3_out)
     icp4_out3 = Conv2D(128, (1,1), strides=1, name='icp4_out3', activation='relu')(icp4_pool)
 
-    icp4_out0 = Conv2D(256, (1,1), strides=1, name='icp4_out0', activation='relu')(icp3_out)
+    icp4_out0 = Conv2D(256, (1,1), strides=1, name='icp4_out0', activation='relu')(Cropping2D(cropping=1)(icp3_out))
     #
     #
-    icp4_out = concatenate([icp4_out1, icp4_out2, icp4_out3], name='icp4_out')
+    icp4_out = concatenate([icp4_out0, icp4_out1, icp4_out2, icp4_out3], name='icp4_out')
     cls3_pool = AveragePooling2D((5,5), strides=3, name='cls3_pool')(icp4_out)
     cls3_reduction = Conv2D(128, (1,1), strides=1, name='cls3_reduction', activation='relu')(cls3_pool)
     cls3_flatten = Flatten()(cls3_reduction)
-    cls3_fc1 = Dense(1024, name='cls_fc1')(cls3_flatten)
-    cls3_fc2 = Dense(7354, name='cls_fc2')(cls3_fc1)
+    cls3_fc1 = Dense(1024, name='cls3_fc1')(cls3_flatten)
+    cls3_fc2 = Dense(7354, name='cls3_fc2')(cls3_fc1)
     loss = Activation('softmax')(cls3_fc2)
-
-    # model0 = Model(inputs=input, outputs=icp1_out0)
-    # model0.summary()
-    # model1 = Model(inputs=input, outputs=icp1_out1)
-    # model1.summary()
-    # model3 = Model(input=input, outputs=icp1_out3)
-    # model3.summary()
 
     model = Model(inputs=input, outputs=loss)
     model.summary()
+    setWeights(model)
     return model
 
+
+def classify(filename, model):
+    filePath = "./images/"+filename
+    img = image.load_img(filePath, target_size=(150,150))
+    x = image.img_to_array(img)
+    # print(x.shape)
+    x = np.expand_dims(x, axis=0)
+    # print(x.shape)
+    y = model.predict(x)
+    print(np.argmax(y[0]))
+    print(np.sort(y[0]))
 
 
 # def test():
@@ -129,5 +135,16 @@ def build_model():
 #     print(model_cos.predict([input_a, input_b]))
 
 
-setWeights()
-build_model()
+if __name__ == '__main__':
+    model = build_model()
+    # setWeights(model)
+    # classify(model)
+
+    classify("26023.bmp", model)
+    classify("fu1.bmp", model)
+    classify("fu2.bmp", model)
+    classify("fu3.bmp", model)
+    classify("fu4.bmp", model)
+    classify("zhong1.png",model)
+    classify("zhong2.png", model)
+    classify("zhong3.png", model)
