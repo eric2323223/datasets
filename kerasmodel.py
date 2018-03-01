@@ -17,6 +17,8 @@ def setWeights(model):
         model.get_layer(layerName).set_weights([kernel.value, bias.value])
     print("weights are set")
 
+def tain_model(model):
+    model.compile()
 
 def build_model():
     input = Input(shape=(150, 150, 3))
@@ -103,16 +105,17 @@ def build_model():
     return model
 
 
-def classify(filename, model):
-    filePath = "./images/"+filename
-    img = image.load_img(filePath, target_size=(150,150))
-    x = image.img_to_array(img)
-    # print(x.shape)
-    x = np.expand_dims(x, axis=0)
-    # print(x.shape)
-    y = model.predict(x)
-    print(np.argmax(y[0]))
-    print(np.sort(y[0]))
+def classify(filenames, model):
+    for name in filenames:
+        filePath = "./images/"+name
+        img = image.load_img(filePath, target_size=(150,150))
+        x = image.img_to_array(img)
+        # print(x.shape)
+        x = np.expand_dims(x, axis=0)
+        # print(x.shape)
+        y = model.predict(x)
+        print(np.argmax(y[0]))
+        print(np.sort(y[0]))
 
 
 # def test():
@@ -140,11 +143,4 @@ if __name__ == '__main__':
     # setWeights(model)
     # classify(model)
 
-    classify("26023.bmp", model)
-    classify("fu1.bmp", model)
-    classify("fu2.bmp", model)
-    classify("fu3.bmp", model)
-    classify("fu4.bmp", model)
-    classify("zhong1.png",model)
-    classify("zhong2.png", model)
-    classify("zhong3.png", model)
+    classify(["zhong1.png", "zhong2.png", "zhong3.png", "zhong4.png"], model)
